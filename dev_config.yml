@@ -58,6 +58,15 @@
             - comment: "tmux-yank - advanced copy mode"
               commands:
                 - "set": "-g @plugin 'tmux-plugins/tmux-yank'"
+            - comment: "tmux-sidebar - provides tree view for inspecting current path/filesystem"
+              commands:
+                - "set": "-g @plugin 'tmux-plugins/tmux-sidebar'"
+            - comment: "tmux-open - opening highlighted selection directly from Tmux copy mode"
+              commands:
+                - "set": "-g @plugin 'tmux-plugins/tmux-open'"
+            - comment: "tmux-copycat - advanced regex searching"
+              commands:
+                - "set": "-g @plugin 'tmux-plugins/tmux-copycat'"
             - comment: "initialize TMUX plugin manager (keep this line at the very bottom of tmux.conf)"
               commands:
                 - "run": "'~/.tmux/plugins/tpm/tpm'"
