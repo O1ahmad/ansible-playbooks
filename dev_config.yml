@@ -1,5 +1,5 @@
 ---
-- name: Render customized tmux configuration
+- name: Render customized development configuration
   hosts: all
   become: true
   roles:
@@ -143,7 +143,6 @@
               commands:
                 - "colorscheme": "onedark"
                 - "set": "t_Co=256"
-                - "set": "termguicolors"
     - role: 0x0i.tmux
       become: true
       vars:

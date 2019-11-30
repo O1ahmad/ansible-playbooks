@@ -1,0 +1,23 @@
+---
+- name: Setup host access across network via SSH
+  hosts: all
+  become: true
+  roles:
+    - role: 0x0i.openssh
+      become: true
+      vars:
+        managed_configs: ['authorized_keys']
+        auto_enable_agent: 
+          awilson:
+            run_args: []   
+        ssh_config:
+          authorized_keys:
+              awilson:
+                "nightcrawler-access":
+                   options:
+                     - 'environment="NAME=nightcrawler"'
+                   key: "/home/awilson/.ssh/nightcrawler.pub"
+                "morph-access":
+                   options:
+                     - 'environment="NAME=morph"'
+                   key: "/home/awilson/.ssh/morph.pub"
