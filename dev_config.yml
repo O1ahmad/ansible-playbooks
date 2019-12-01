@@ -15,6 +15,9 @@
             - comment: "Disable compatibility with vi"
               commands:
                 - "set": "nocompatible"
+            - comment: "Load sane defaults"
+              commands:
+                - "source": "$VIMRUNTIME/defaults.vim"
             - comment: "Help force plugins to load correctly when re-enabled below"
               commands:
                 - "filetype": "off"
