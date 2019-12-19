@@ -1,0 +1,112 @@
+---
+- name: Enable elasticsearch dual-node systemd daemon
+  hosts: dev
+  become: true
+  roles:
+    - role: 0x0i.elasticsearch
+      vars:
+        managed_configs: ['elasticsearch_config']
+        default_data_dir: /mnt/data/elasticsearch
+        default_log_dir: /mnt/logs/elasticsearch
+        config:
+          cluster.name: 'dev-es'
+          node.master: true
+          node.data: true
+          path.logs: /mnt/logs/elasticsearch
+          path.data: /mnt/data/elasticsearch
+        extra_run_args:
+          - '--verbose'
+        custom_unit_properties:
+          StandardOutput: journal
+          StandardError: inherit
+    - role: 0x0i.kibana
+      vars:
+        default_data_dir: /mnt/data/kibana
+        config:
+          server.name: nightcrawler-node
+          path.data: /mnt/data/kibana
+          logging.verbose: true
+        extra_run_args:
+          - '--verbose'
+        custom_unit_properties:
+          StandardOutput: journal
+          StandardError: inherit
+    - role: 0x0i.fluentd
+      vars:
+        fluentd_user: awilson
+        install_type: package
+        plugins:
+          - name: fluentd-plugin-systemd
+        config:
+          - directives:
+              - comment: include all custom directive configurations
+                plugin: include
+                content: |
+                  @include /etc/fluentd/conf.d/*.conf
+          - name: "journal-pipeline"
+            path: /etc/fluentd/conf.d
+            directives:
+              - plugin: source
+                content: |
+                  <source>
+                    @type systemd
+                    tag elasticsearch
+                    path /var/log/journal
+                    matches [{ "_SYSTEMD_UNIT": "elasticsearch.service" }]
+                    read_from_head true
+
+
+                    <entry>
+                      fields_strip_underscores true
+                      fields_lowercase true
+                    </entry>
+                  </source>
+              - plugin: source
+                content: |
+                  <source>
+                    @type systemd
+                    tag zecminer
+                    path /var/log/journal
+                    matches [{ "_SYSTEMD_UNIT": "zecminer.service" }]
+                    read_from_head true
+
+                    <entry>
+                      fields_strip_underscores true
+                      fields_lowercase true
+                    </entry>
+                  </source>
+              - plugin: source
+                content: |
+                  <source>
+                    @type systemd
+                    tag kibana
+                    path /var/log/journal
+                    matches [{ "_SYSTEMD_UNIT": "kibana.service" }]
+                    read_from_head true
+
+                    <entry>
+                      field_map {"__REALTIME_TIMESTAMP": "timestamp"}
+                      fields_strip_underscores true
+                      fields_lowercase true
+                    </entry>
+                  </source>
+              - plugin: match
+                content: |
+                  <match *>
+                    @type elasticsearch
+                    host localhost
+                    port 9200
+                    index_name fluentd.${tag}.%Y%m%d
+					<buffer tag, time>
+                      timekey 1h # chunks per hours ("3600" also available)
+                    </buffer>
+                  </match>
+              - plugin: match
+                match: "*"
+                attributes:
+                  "@type": stdout
+        extra_run_args:
+          - '--verbose'
+        custom_unit_properties:
+          StandardOutput: journal
+          StandardError: inherit
