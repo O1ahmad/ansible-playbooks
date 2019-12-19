@@ -26,13 +26,15 @@
             Unit:
               Description: Zcash cuda miner written for pascal GPUs
               Documentation: https://github.com/nanopool/ewbf-miner
+            Service:
+              ExecStart: /opt/zecminer/miner --config /opt/zecminer/miner.cfg
+              ExecReload: /bin/kill -HUP $MAINPID
               User: zecminer
               Group: zecminer
               WorkingDirectory: /opt/zecminer
               StandardOutput: journal
               StandardError: Inherit
-            Service:
-              ExecStart: /opt/zecminer/miner --config /opt/zecminer/miner.cfg
-              ExecReload: /bin/kill -HUP $MAINPID
             Install:
               WantedBy: multi-user.target
+    - role: 0x0i.lotus
+      become: true
