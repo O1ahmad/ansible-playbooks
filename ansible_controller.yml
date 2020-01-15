@@ -1,0 +1,34 @@
+---
+- name: Setup Ansible controller
+  hosts: controller
+  become: true
+  roles:
+    - role: 0x0i.ansible
+      become: true
+      vars:
+        install_type: package
+        config:
+          defaults:
+            log_path: /var/log/ansible/debug.log
+            ansible_managed: Managed by Ansible (0xO1)
+            interpreter_python: /usr/bin/python3
+          diff:
+            always: True
+          colors:
+            debug: bright purple
+            warn: purple
+            deprecate: dark gray
+        galaxy_roles:
+          - 0x0I.ansible
+          - 0x0I.systemd
+          - 0x0I.journald
+          - 0x0I.openssh
+          - 0x0I.geth
+          - 0x0I.lotus
+          - 0x0I.prometheus
+          - 0x0I.grafana
+          - 0x0I.elasticsearch
+          - 0x0I.fluentd
+          - 0x0I.kibana
+          - 0x0I.tmux
+          - 0x0I.vim
