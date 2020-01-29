@@ -12,6 +12,7 @@
             log_path: /var/log/ansible/debug.log
             ansible_managed: Managed by Ansible (0xO1)
             interpreter_python: /usr/bin/python3
+            callback_whitelist: profile_roles, profile_tasks, timer
           diff:
             always: True
           colors:
