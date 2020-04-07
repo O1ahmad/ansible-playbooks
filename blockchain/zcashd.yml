@@ -1,0 +1,58 @@
+---
+- name: Launch Zcashd EC2 instance
+  hosts: localhost
+  remote_user: ubuntu
+  tasks:
+    - name: Launch EC2 instance
+      ec2:
+        instance_tags:
+        key_name: morph_ctrl
+        aws_access_key: AKIAI3GWQPT5CV4YCMLA
+        aws_secret_key: 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
+        instance_type: t2.micro
+        image: ami-0ff7189cf12ed8eb6
+        region: us-east-1
+        wait: yes
+        instance_tags:
+          role: zcashd
+          Name: zcashd-node
+        exact_count: 1
+        count_tag:
+          role: zcashd
+        vpc_subnet_id: subnet-782b311f
+        assign_public_ip: yes
+      register: zcashd_ec2
+
+    - name: Resolve Zcashd cluster
+      set_fact:
+        zcashd_cluster: "{{ zcashd_ec2.instances + zcashd_ec2.tagged_instances }}"
+
+    - name: Add new instance to host group
+      when: zcashd_cluster|length > 0
+      add_host:
+        hostname: "{{ item.public_dns_name }}"
+        groupname: zcashd_launched
+        ansible_python_interpreter: /usr/bin/python
+      loop: "{{ zcashd_cluster }}"
+
+    - name: Wait for SSH to come up
+      when: zcashd_cluster|length > 0
+      delegate_to: "{{ item.public_dns_name }}"
+      wait_for_connection:
+        delay: 60
+        timeout: 320
+      loop: "{{ zcashd_cluster }}"
+
+- name: Configure instance(s)
+  hosts: zcashd_launched
+  remote_user: ubuntu
+  roles:
+    - role: 0x0i.zcashd
+      vars:
+        install_type: archive
+        zcashd_config:
+          bind: "{{ ansible_eth0_ipv4 }}"
+          server: 1
+          gen: 1
+          genproclimit: -1
+          equihashsolver: tromp

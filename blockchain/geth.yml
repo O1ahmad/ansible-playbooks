@@ -1,0 +1,61 @@
+---
+- name: Launch Geth EC2 instance
+  hosts: localhost
+  remote_user: centos
+  connection: ssh
+  tasks:
+    - name: Launch EC2 instance
+      ec2:
+        key_name: morph_ctrl
+        aws_access_key: AKIAI3GWQPT5CV4YCMLA
+        aws_secret_key: 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
+        instance_type: t2.micro
+        image: ami-0affd4508a5d2481b
+        region: us-east-1
+        wait: yes
+        instance_tags:
+          role: geth
+          Name: geth-node
+        exact_count: 1
+        count_tag:
+          role: geth
+        vpc_subnet_id: subnet-782b311f
+        assign_public_ip: yes
+      register: geth_ec2
+
+    - name: Resolve Geth cluster
+      set_fact:
+        geth_cluster: "{{ geth_ec2.instances + geth_ec2.tagged_instances }}"
+
+    - name: Add new instance to host group
+      when: geth_ec2|length > 0
+      add_host:
+        hostname: "{{ item.public_dns_name }}"
+        groupname: geth_launched
+        ansible_python_interpreter: /usr/bin/python
+      loop: "{{ geth_cluster }}"
+
+    - name: Wait for SSH to come up
+      when: geth_ec2|length > 0
+      delegate_to: "{{ item.public_dns_name }}"
+      wait_for_connection:
+        delay: 60
+        timeout: 320
+      loop: "{{ geth_cluster }}"
+
+- name: Configure instance(s)
+  hosts: geth_launched
+  remote_user: centos
+  roles:
+  - role: 0x0i.geth
+    vars:
+      geth_config:
+        Eth:
+          SyncMode: light
+        Node:
+          DataDir: /mnt/geth
+      extra_run_args:
+        - --rinkeby
+        - --nousb
+        - --rpc
+        - "--rpcaddr={{ ansible_default_ipv4.address }}"
