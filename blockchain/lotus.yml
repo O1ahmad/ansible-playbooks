@@ -1,0 +1,13 @@
+---
+- name: Setup Lotus service and miner
+  hosts: miner
+  become: true
+  roles:
+    - role: 0x0i.lotus
+      become: true
+      vars:
+        install_type: source
+        version: v0.1.5
+        managed_services:
+          - service
+          - miner

@@ -13,12 +13,30 @@
             - job_name: node_exporter
               static_configs:
                 - targets: ['localhost:9110']
+            - job_name: aws_ec2_exporter_us-east-1
+              static_configs:
+                - targets: ['localhost:9686']
+              scrape_interval: 3m
+              scrape_timeout: 2m
+            - job_name: gcp_gce_exporter_us-east1
+              static_configs:
+                - targets: ['localhost:9692']
+              scrape_interval: 3m
+              scrape_timeout: 2m
         prometheus_exporters:
           - name: node_exporter
             url: https://github.com/prometheus/node_exporter/releases/download/v0.18.1/node_exporter-0.18.1.linux-amd64.tar.gz
             extra_args:
               - '--web.listen-address=0.0.0.0:9110'
               - '--log.level=debug'
+          - name: aws_ec2_exporter_us-east-1
+            url: https://github.com/0x0I/aws_ec2_exporter/archive/v0.1.0.tar.gz
+            unit_properties:
+              ExecStart: docker run --publish 9686:9686 --env REGION=us-east-1 --env-file /opt/prometheus/exporters/aws_ec2_exporter/creds.env 0labs/0x01.aws-ec2-exporter:0.1.0
+          - name: gcp_gce_exporter_us-east1
+            url: https://github.com/0x0I/gcp-gce-exporter/archive/v0.1.0.tar.gz
+            unit_properties:
+              ExecStart: docker run --publish 9692:9692 --env GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp.creds.json --env PROJECT=basix-testing --env LOG_LEVEL=debug --volume /home/awilson/gcp.creds.json /tmp/gcp.creds.json 0labs/0x01.gcp-gce-exporter:0.1.0
     - role: 0x0i.grafana
       vars:
         install_type: archive

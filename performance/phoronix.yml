@@ -1,0 +1,22 @@
+---
+- name: Render customized development configuration
+  hosts: localhost
+  gather_facts: yes
+  become: true
+  roles:
+    - role: 0x0i.phoronix
+      vars:
+        install_type: archive
+        default_run_asynchronous: true
+        default_autopilot: true
+        user_configs:
+          - run_recommended_tests: true
+            run_available_suites: false
+            config:
+              BatchMode:
+                SaveResults: true
+                PromptForTestIdentifier: false
+                PromptForTestDescription: false
+                PromptSaveName: false
+                RunAllTestCombinations: true
+                Configured: true

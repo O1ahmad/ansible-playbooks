@@ -1,0 +1,96 @@
+---
+- name: Launch Elasticsearch EC2 cluster
+  hosts: localhost
+  remote_user: centos
+  connection: ssh
+  tasks:
+    - name: Launch EC2 instance
+      ec2:
+        key_name: morph_ctrl
+        aws_access_key: AKIAI3GWQPT5CV4YCMLA
+        aws_secret_key: 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
+        instance_type: t3.medium
+        image: ami-0affd4508a5d2481b
+        region: us-east-1
+        spot_price: 0.0125
+        spot_wait_timeout: 600
+        spot_launch_group: es_cluster
+        spot_type: persistent
+        wait: yes
+        instance_tags:
+          role: elasticsearch
+          Name: es-node
+        exact_count: 3
+        count_tag:
+          role: elasticsearch
+        vpc_subnet_id: subnet-782b311f
+        assign_public_ip: yes
+        instance_initiated_shutdown_behavior: stop
+      register: es_ec2
+
+    - name: Resolve ES cluster
+      set_fact:
+        es_cluster: "{{ es_ec2.instances + es_ec2.tagged_instances }}"
+
+    - name: Add new instance to host group
+      when: es_ec2|length > 0
+      add_host:
+        hostname: "{{ item.public_dns_name }}"
+        groupname: es_launched
+        ansible_python_interpreter: /usr/bin/python
+      loop: "{{ es_cluster }}"
+
+    - name: Wait for SSH to come up
+      when: es_ec2|length > 0
+      delegate_to: "{{ item.public_dns_name }}"
+      wait_for_connection:
+        timeout: 320
+      loop: "{{ es_cluster }}"
+
+- name: Configure instance(s)
+  hosts: es_launched
+  remote_user: centos
+  pre_tasks:
+    - debug:
+        var: hostvars['localhost']['es_cluster'] | map(attribute='private_dns_name') | list
+    - name: Ensure VM maximum heap map count is sufficient (persisted)
+      become: true
+      lineinfile:
+        path: /etc/sysctl.conf
+        regexp: '^vm.max_map_count\s*='
+        line: vm.max_map_count=262144
+    - name: Ensure VM maximum heap map count is sufficient (current runtime)
+      become: true
+      command: sysctl -w vm.max_map_count=262144
+    - name: Ensure setting of proper security file constraints (persisted)
+      become: true
+      lineinfile:
+        path: /etc/security/limits.conf
+        regexp: '^elasticsearch\s*-\s*nofile'
+        line: elasticsearch - nofile 65535
+  roles:
+  - role: 0x0i.elasticsearch
+    vars:
+      managed_configs: ['elasticsearch_config', 'jvm_options']
+      config:
+        cluster.name: O1-cluster
+        node.master: true
+        node.data: true
+        network.host: 0.0.0.0
+        network.publish_host: "{{ ansible_fqdn }}"
+        discovery.seed_hosts: "{{ groups['es_launched'] }}"
+        cluster.initial_master_nodes: "{{ hostvars['localhost']['es_cluster'] | map(attribute='private_dns_name') | list
+  | unique }}"
+      jvm_options:
+        - comment: adjust JVM settings to handle restricted placement
+          arguments:
+            - '-Xms512m'
+            - '-Xmx512m'
+            - '-XX:-UseSerialGC'
+            - '-XX:+UseG1GC'
+      extra_run_args:
+        - '--verbose'
+      custom_unit_properties:
+        Environment: "ES_HOME=/opt/elasticsearch"
+        LimitNOFILE: infinity
+        LimitNPROC: 65535
