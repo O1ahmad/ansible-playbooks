@@ -7,8 +7,6 @@
       ec2:
         instance_tags:
         key_name: morph_ctrl
-        aws_access_key: AKIAI3GWQPT5CV4YCMLA
-        aws_secret_key: 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
         instance_type: t2.micro
         image: ami-0ff7189cf12ed8eb6
         region: us-east-1
