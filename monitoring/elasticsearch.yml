@@ -7,8 +7,6 @@
     - name: Launch EC2 instance
       ec2:
         key_name: morph_ctrl
-        aws_access_key: AKIAI3GWQPT5CV4YCMLA
-        aws_secret_key: 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
         instance_type: t3.medium
         image: ami-0affd4508a5d2481b
         region: us-east-1
