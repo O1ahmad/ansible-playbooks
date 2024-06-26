@@ -1,0 +1,71 @@
+---
+- name: Create a security group
+  amazon.aws.ec2_security_group:
+    name: "{{ security_group_name }}"
+    description: "{{ security_group_description }}"
+    region: "{{ cloud_location }}"
+    rules: "{{ ingress_ports }}"
+    state: present
+  register: security_group
+
+- name: Print return information from the previous task
+  ansible.builtin.debug:
+    var: security_group
+
+- name: Create an AWS SSH key pair if not defined
+  amazon.aws.ec2_key:
+    name: "default-keypair"
+    region: "{{ cloud_location }}"
+    state: present
+  register: aws_keypair
+  when: ssh_public_key is undefined
+
+- name: Save AWS SSH private key
+  ansible.builtin.copy:
+    content: "{{ aws_keypair.key.private_key }}"
+    dest: "~/.ssh/default-keypair.pem"
+    mode: '0600'
+  when: ssh_public_key is undefined
+
+- name: Set AWS SSH keypair variable
+  ansible.builtin.set_fact:
+    ssh_public_key: "{{ aws_keypair.key.name }}"
+  when: ssh_public_key is undefined
+
+- name: Create an EC2 instance
+  amazon.aws.ec2_instance:
+    name: "{{ instance_name }}"
+    instance_type: "{{ instance_type }}"
+    region: "{{ cloud_location }}"
+    image_id: "{{ instance_image }}"
+    security_groups:
+      - default
+      - "{{ security_group.group_id }}"
+    wait: "{{ wait_for_ssh | bool }}"
+    key_name: "{{ ssh_public_key }}"
+    tags:
+      Name: "{{ instance_tag }}"
+    volumes:
+      - device_name: /dev/sda1
+        ebs:
+          volume_size: "{{ storage_size }}"
+    network:
+      assign_public_ip: "{{ public_ip }}"
+  register: ec2
+
+- name: Wait for the instance to be reachable via SSH
+  ansible.builtin.wait_for:
+    host: "{{ ec2.instances[0].public_ip_address }}"
+    port: 22
+    delay: 1
+    timeout: 320
+    state: started
+  when: wait_for_ssh | bool
+
+- name: Add instance to inventory
+  ansible.builtin.add_host:
+    name: "{{ ec2.instances[0].public_ip_address }}"
+    groups: "{{ instance_tag }}"
+    ansible_host: "{{ ec2.instances[0].public_ip_address }}"
+    ansible_user: "{{ cloud_user }}"
+    ansible_ssh_private_key_file: "{{ ssh_private_key_path }}"

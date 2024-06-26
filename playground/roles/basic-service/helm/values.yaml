@@ -1,0 +1,127 @@
+name: foo-service
+commonName: foo-service.foo
+namespace: foo
+image:
+command: []
+args: []
+dockercfg:
+
+# Set if service exposes ingress endpoints
+# serviceType: ClusterIP
+# servicePort: 9000
+# serviceTargetPort: 9000
+# healthCheckEndpoint: /
+
+minReplicas: 1
+maxReplicas: 3
+createNamespace: true
+
+env:
+  config:
+    PLACEHOLDER: placeholder
+
+# see: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#Container
+initContainers: {}
+
+extraContainers: {}
+#  example-container:
+#  - name: example-container
+#    image: busybox:latest
+#    command: ['sh', '-c', 'echo hello']
+
+# see: https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/volume/#Volume
+extraVolumes: {}
+# example-volume
+# - name: empty-example
+#   emptyDir: {}
+volumesFromConfigMaps: {}
+# example-volume
+#   configMapName: example-config
+
+# see: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#volumes-1
+extraVolumeMounts: {}
+# empty-example:
+# - name: empty-volume
+#   mountPath: /tmp
+
+# see: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
+labels: {}
+
+# see: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+annotations: {}
+
+configMaps: {}
+# example-config
+#   file: config.toml
+#   data: |
+#     a=1
+#     [section]
+#     b=2
+
+serviceRoles: {}
+# example-role:
+#   serviceAccount: example-svc-account
+#   rules:
+#   - apiGroups:
+#     - ""
+#     - apps
+#    resources:
+#    - pods
+#    verbs:
+#    - create
+
+# see: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/
+deployStatefulSet: false
+statefulSetOptions:
+  pvcName: ebs
+  pvcAccessMode: ReadWriteOnce
+  pvcStorageClass: gp3-ext4
+  pvcStorageCapacity: 1Gi
+
+deployStategy: {}
+# [Deployment]
+# strategy:
+#   type: RollingUpdate
+#   rollingUpdate:
+#     maxUnavailable: 1
+# [StatefulSet]
+# updateStrategy:
+#   type: RollingUpdate
+
+storageClass:
+  []
+  # - create: true
+  #   name: efs-sc
+  #   provisioner: efs.csi.aws.com
+
+# see: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims
+persistentVolumeClaim:
+  []
+  # - name: mount1
+  #   accessModes: ReadWriteMany
+  #   storage: 10Gi
+  #   storageClassName: efs-sc
+  #   mountPath: /mount1
+  # - name: mount2
+  #   accessModes: ReadWriteMany
+  #   storage: 11Gi
+  #   storageClassName: efs-sc
+  #   mountPath: /mount2
+
+# see: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistent-volumes
+persistentVolume:
+  []
+  # - name: mount1
+  #   storage: 10Gi
+  #   accessModes: ReadWriteMany
+  #   reclaimPolicy: Retain
+  #   driver: efs.csi.aws.com
+  #   volumeHandle: "fs-123456789"
+  #   subPath: "mount1"
+  # - name: mount2
+  #   storage: 11Gi
+  #   accessModes: ReadWriteMany
+  #   reclaimPolicy: Retain
+  #   driver: efs.csi.aws.com
+  #   volumeHandle: "fs-123456789"
+  #   subPath: "mount2"
