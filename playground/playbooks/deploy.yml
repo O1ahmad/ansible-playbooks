@@ -1,0 +1,265 @@
+---
+# Ethereum Execution Layer Clients
+
+- name: Configure execution layer instance(s)
+  hosts: localhost
+  roles:
+  - role: ../roles/cloud-node
+    vars:
+      cloud_provider: aws
+      instance_name: eth-execution
+      instance_type: m5a.xlarge
+      instance_tag: geth
+      security_group_name: geth-sg
+      ssh_public_key: dev
+      ssh_private_key_path: ~/.ssh/dev.pem
+      ingress_ports:
+      - proto: tcp
+        ports:
+        - 22
+        - 8545
+        - 6060
+        - 4000
+        - 8080
+        cidr_ip: 0.0.0.0/0
+
+- name: Configure Ethereum execution layer clients
+  hosts: geth
+  remote_user: ubuntu
+  become: true
+  roles:
+  - role: ../roles/basic-service
+    vars:
+      setup_mode: systemd
+      name: geth
+      binary_url: https://gethstore.blob.core.windows.net/builds/geth-linux-amd64-1.14.5-0dd173a7.tar.gz
+      command: >
+        /usr/local/bin/geth-linux-amd64-1.14.5-0dd173a7/geth --config /config/geth.toml --sepolia --http --metrics
+        --metrics.addr 0.0.0.0 --metrics.port 6060
+      cpus: 100%
+      memory: 2G
+      config:
+        geth.toml:
+          destinationPath: /config/geth.toml
+          data: |
+            [Eth]
+            NetworkId = 11155111  # Sepolia network ID
+            SyncMode = "snap"
+
+            [Node]
+            DataDir = "/home/ubuntu/.ethereum/sepolia"
+            HTTPHost = "0.0.0.0"
+            HTTPPort = 8545
+            HTTPModules = ["net", "web3", "eth"]
+            WSHost = "0.0.0.0"
+            WSPort = 8546
+            WSModules = ["net", "web3", "eth"]
+
+  - role: ../roles/basic-service
+    vars:
+      setup_mode: systemd
+      name: prysm-beacon
+      binary_url: https://github.com/prysmaticlabs/prysm/releases/download/v5.0.4/beacon-chain-v5.0.4-linux-amd64
+      command: >
+        beacon-chain-v5.0.4-linux-amd64 --accept-terms-of-use --sepolia --jwt-secret=/home/ubuntu/.ethereum/sepolia/geth/jwtsecret --datadir=/home/ubuntu --execution-endpoint=http://127.0.0.1:8551
+        --checkpoint-sync-url=https://sepolia.beaconstate.info --genesis-beacon-api-url=https://sepolia.beaconstate.info --rpc-host 0.0.0.0
+        --monitoring-host 0.0.0.0 --monitoring-port 8080
+      cpus: 100%
+      memory: 2G
+
+- name: Activate execution services
+  hosts: geth
+  become: true
+  tasks:
+  - name: Start geth service
+    ansible.builtin.systemd_service:
+      name: geth
+      daemon_reload: true
+      enabled: true
+      state: started
+  - name: Start prysm-beacon service
+    ansible.builtin.systemd_service:
+      name: prysm-beacon
+      daemon_reload: true
+      enabled: true
+      state: started
+
+# Ethereum Consensus Layer Clients
+
+- name: Show inventory details
+  hosts: localhost
+  tasks:
+  - name: Get the public IP of the first host in the "geth" group
+    set_fact:
+      first_geth_host_ip: "{{ hostvars[groups['geth'][0]].ansible_host }}"
+  
+  - name: Debug print the public IP
+    debug:
+      msg: "The public IP of the first host in the 'geth' group is {{ first_geth_host_ip }}"
+
+- name: Configure consensus layer instance(s)
+  hosts: localhost
+  roles:
+  - role: ../roles/cloud-node
+    vars:
+      cloud_provider: aws
+      instance_name: eth-consensus
+      instance_tag: prysm-validator
+      security_group_name: validator-sg
+      ssh_public_key: dev
+      ssh_private_key_path: ~/.ssh/dev.pem
+      ingress_ports:
+      - proto: tcp
+        ports:
+        - 22
+        cidr_ip: 0.0.0.0/0
+      - proto: tcp
+        ports:
+        - 8081
+        cidr_ip: 0.0.0.0/0
+
+- name: Configure Ethereum consensus layer clients
+  hosts: prysm-validator
+  remote_user: ubuntu
+  become: true
+  roles:
+  - role: ../roles/basic-service
+    vars:
+      setup_mode: systemd
+      name: prysm-validator
+      binary_url: https://github.com/prysmaticlabs/prysm/releases/download/v5.0.4/validator-v5.0.4-linux-amd64
+      command: >
+        /usr/local/bin/validator-v5.0.4-linux-amd64 --accept-terms-of-use
+        --beacon-rpc-provider {{ hostvars[groups['geth'][0]].ansible_host }}:4000 --sepolia
+        --wallet-dir /home/ubuntu/.eth2validators/prysm-wallet-v2 --wallet-password-file /home/ubuntu/password
+        --beacon-rest-api-provider http://{{ hostvars[groups['geth'][0]].ansible_host }}:3500
+        --monitoring-host 0.0.0.0 --monitoring-port 8081
+      cpus: 100%
+      memory: 2G
+
+- name: Activate consensus services
+  hosts: prysm-validator
+  become: true
+  tasks:
+  - name: Activate consensus services
+    ansible.builtin.systemd_service:
+      name: prysm-validator
+      daemon_reload: true
+      enabled: true
+      state: started
+
+# Monitoring Services
+
+- name: Configure monitoring/observability layer instance(s)
+  hosts: localhost
+  roles:
+  - role: ../roles/cloud-node
+    vars:
+      cloud_provider: aws
+      instance_name: monitoring
+      instance_tag: monitoring 
+      security_group_name: monitoring-sg
+      ssh_public_key: dev
+      ssh_private_key_path: ~/.ssh/dev.pem
+      ingress_ports:
+      - proto: tcp
+        ports:
+        - 22
+        cidr_ip: 0.0.0.0/0
+      - proto: tcp
+        ports:
+        - 9090
+        cidr_ip: 0.0.0.0/0
+      - proto: tcp
+        ports:
+        - 3000
+        cidr_ip: 0.0.0.0/0
+
+- name: Configure Prometheus and Grafana services
+  hosts: monitoring
+  remote_user: ubuntu
+  become: true
+  roles:
+  - role: ../roles/basic-service
+    vars:
+      setup_mode: systemd
+      name: prometheus
+      binary_url: https://github.com/prometheus/prometheus/releases/download/v2.53.0/prometheus-2.53.0.linux-amd64.tar.gz
+      command: >
+        /usr/local/bin/prometheus-2.53.0.linux-amd64/prometheus --config.file=/config/prometheus.yml
+      cpus: 50%
+      memory: 2G
+      config:
+        prometheus.yml:
+          destinationPath: /config/prometheus.yml
+          data: |
+            global:
+              scrape_interval: 15s
+              evaluation_interval: 15s
+
+            scrape_configs:
+            - job_name: "geth"
+              metrics_path: "/debug/metrics/prometheus"
+              static_configs:
+              - targets: ["{{ hostvars[groups['geth'][0]].ansible_host }}:6060"]
+            - job_name: "prysm-beacon"
+              metrics_path: "/metrics"
+              static_configs:
+              - targets: ["{{ hostvars[groups['geth'][0]].ansible_host }}:8080"]
+            - job_name: "prysm-validator"
+              metrics_path: "/metrics"
+              static_configs:
+              - targets: ["{{ hostvars[groups['prysm-validator'][0]].ansible_host }}:8081"]
+  - role: ../roles/basic-service
+    vars:
+      setup_mode: systemd
+      name: grafana
+      binary_url: https://dl.grafana.com/enterprise/release/grafana-enterprise-11.1.0.linux-amd64.tar.gz
+      command: >
+        /usr/local/bin/grafana-v11.1.0/bin/grafana server --config=/config/grafana.ini --homepath=/usr/local/bin/grafana-v11.1.0/
+      cpus: 50%
+      memory: 2G
+      config:
+        grafana.ini:
+          destinationPath: /config/grafana.ini
+          data: |
+            [server]
+            protocol = http
+            # The ip address to bind to, empty will bind to all interfaces
+            http_addr =
+            http_port = 3000
+
+            [paths]
+            data = /home/ubuntu
+            logs = /home/ubuntu
+
+            [security]
+            disable_initial_admin_creation = false
+            admin_user = admin
+            admin_password = password
+        prometheus.yml:
+          destinationPath: /etc/grafana/provisioning/datasources/prometheus.yml
+          data: |
+            apiVersion: 1
+
+            datasources:
+              - name: Prometheus
+                type: prometheus
+                url: http://localhost:9090
+
+- name: Activate monitoring services
+  hosts: monitoring
+  become: true
+  tasks:
+  - name: Start prometheus service
+    ansible.builtin.systemd_service:
+      name: prometheus
+      daemon_reload: true
+      enabled: true
+      state: started
+  - name: Start grafana service
+    ansible.builtin.systemd_service:
+      name: grafana
+      daemon_reload: true
+      enabled: true
+      state: started
